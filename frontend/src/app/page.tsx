@@ -26,6 +26,8 @@ export default function Home() {
   const [additionalQuestions, setAdditionalQuestions] = useState<AdditionalQuestion[]>([]);
   const [showAdditionalQuestions, setShowAdditionalQuestions] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4.1');
+  const [isSubmitDisabled, setIsSubmitDisabled] = useState(false);
+  const [requirementFeedback, setRequirementFeedback] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,9 +93,67 @@ export default function Home() {
     );
   };
   
-  const handleApplyAdditionalInfo = () => {
-    setShowAdditionalQuestions(false);
-    handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+  const handleApplyAdditionalInfo = async () => {
+    if (isSubmitDisabled || isLoading) return;
+    
+    // Disable button to prevent multiple rapid clicks
+    setIsSubmitDisabled(true);
+    setIsLoading(true);
+    setRequirementFeedback(null);
+    
+    try {
+      const response = await axios.post('http://localhost:8000/prompt/generate', {
+        keywords: keywords.trim(),
+        model: selectedModel,
+        additionalInfo: additionalQuestions.reduce((acc, q) => {
+          acc[q.id] = q.answer;
+          return acc;
+        }, {} as Record<string, string>)
+      });
+      
+      console.log("Server response:", response.data);
+      
+      // Force a minimum processing time to prevent flickering
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (response.data.needMoreInfo) {
+        // Still need more info, update questions and keep asking
+        setRequirementFeedback(response.data.feedback || '추가 정보가 필요합니다.');
+        if (response.data.questions && response.data.questions.length > 0) {
+          setAdditionalQuestions(response.data.questions);
+        }
+        setShowAdditionalQuestions(true);
+      } else if (response.data.prompts && response.data.prompts.length > 0) {
+        // Got prompts, show them
+        console.log("Setting prompts:", response.data.prompts);
+        setPrompts(response.data.prompts);
+        setShowAdditionalQuestions(false);
+        // 프롬프트 생성이 완료되면 additionalQuestions 초기화
+        setAdditionalQuestions([]);
+      } else {
+        // Handle case where no prompts were returned
+        console.error("No prompts in response:", response.data);
+        setRequirementFeedback('프롬프트를 생성할 수 없습니다. 다른 키워드를 시도해보세요.');
+        setShowAdditionalQuestions(false);
+      }
+    } catch (error) {
+      console.error('Error generating prompts:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        });
+      }
+      setRequirementFeedback('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      setShowAdditionalQuestions(false);
+    } finally {
+      setIsLoading(false);
+      // Re-enable button after a short delay to prevent rapid clicking
+      setTimeout(() => {
+        setIsSubmitDisabled(false);
+      }, 300);
+    }
   };
 
   return (
