@@ -7,7 +7,21 @@ from dotenv import load_dotenv
 from app.routers import prompt
 
 # 환경 변수 로드
-load_dotenv()
+load_dotenv() # This loads variables from a .env file into environment variables.
+
+# --- LLM Integration Note ---
+# For the LLM features in this application (e.g., in app.routers.prompt) to function
+# when integrated with a real LLM provider like OpenAI, an API key is required.
+# The application expects the API key to be available as an environment variable.
+#
+# For OpenAI, set the OPENAI_API_KEY environment variable.
+# If you are using a .env file (as `python-dotenv` is used here), add a line like:
+# OPENAI_API_KEY="your_actual_openai_api_key_here"
+#
+# Make sure this key is kept secret and not committed to version control.
+# The LLM client (e.g., openai.OpenAI()) will typically automatically
+# detect this environment variable.
+# --- End LLM Integration Note ---
 
 app = FastAPI(
     title="프롬프트 생성기 API",
